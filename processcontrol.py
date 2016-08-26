@@ -19,19 +19,8 @@ from email.mime.text import MIMEText
 
 import platform
 
-import sqlite3 as lite
 con = None
 
-
-import sys # for command line arguments.
-# ***********************************#
-# Defining the connection to the platform:
-if platform.system() == "Darwin":
-    con = lite.connect('/Users/Annerose/Documents/15-16/Data/blogger_continuous.db')
-if platform.system() == "Linux":
-    con = lite.connect('/home/annerose/Python/blogger_continuous.db')
-cur = con.cursor()
-con.text_factory = str
 
 # ***********************************#
 # Starting the process
