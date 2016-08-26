@@ -3,6 +3,7 @@
 # **************************************************** #
 
 import sys # for command line arguments.
+import config # importing user agent from separate file.
 # **************************************************** #
 
 BOT_NAME = 'blogtexts'
@@ -49,7 +50,7 @@ DOWNLOADER_MIDDLEWARE = {'spider.middlewares.RetryChangeProxyMiddleware': 600}
 
 # **************************************************** #
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-USER_AGENT = 'nisser (+http://www.cnc.uni-konstanz.de/people/nisser/)'
+USER_AGENT = config.user_agent
 
 # Use a different user agent for example in case that the other user agent is blocked:
 # USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:7.0.1) Gecko/20100101 Firefox/7.7'
