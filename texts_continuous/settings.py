@@ -44,7 +44,7 @@ LOG_LEVEL = 'INFO'
 # **************************************************** #
 # **************************************************** #
 # Downloader middleware using Tor:
-DOWNLOADER_MIDDLEWARE = {'spider.middlewares.RetryChangeProxyMiddleware': 600}
+DOWNLOADER_MIDDLEWARE = {'texts_continuous.middlewares.RetryChangeProxyMiddleware': 600}
 
 
 
