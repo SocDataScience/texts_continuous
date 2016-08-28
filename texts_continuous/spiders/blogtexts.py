@@ -56,20 +56,34 @@ class BlogTextSpider(Spider):
     # 1. get all the blogurl values that are only present in the Blogurls table,
     # but not yet in the Blogtext table:
 
-    cur.execute("SELECT blogurls.blogurl \
+    cur.execute("SELECT blogurl \
     FROM blogurls \
-    WHERE blogurls.blogID NOT IN (SELECT DISTINCT blogurls.ID \
+    WHERE blogID NOT IN (SELECT DISTINCT blogurls.ID \
     FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
     blogurls = cur.fetchall()
 
+    # Use this approach if you really want to get ALL blogtexts:
+    # cur.execute("SELECT blogurl, MAX(pagenumber) \
+    # FROM Blogtexts \
+    # WHERE Blogtexts.blogurl IN \
+    # (SELECT DISTINCT Blogurls.blogurl FROM Blogurls, Blogtexts WHERE Blogurls.blogurl = Blogtexts.blogurl) \
+    # AND Blogtexts.blogurl NOT IN (SELECT DISTINCT Blogtexts.blogurl \
+    # FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
+    # GROUP BY blogurl")
+    # blogurls_continue = cur.fetchall()
+
+    # Use this approach if 50 blogtexts per blog are enough:
     cur.execute("SELECT blogurl, MAX(pagenumber) \
     FROM Blogtexts \
-    WHERE Blogtexts.blogurl IN \
+    WHERE blogurl IN \
     (SELECT DISTINCT Blogurls.blogurl FROM Blogurls, Blogtexts WHERE Blogurls.blogurl = Blogtexts.blogurl) \
-    AND Blogtexts.blogurl NOT IN (SELECT DISTINCT Blogtexts.blogurl \
+    AND blogurl NOT IN (SELECT DISTINCT Blogtexts.blogurl \
     FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
+    AND blogurl IN (SELECT blogurl FROM \
+    (SELECT blogurl, COUNT(*) as c FROM Blogtexts GROUP BY blogurl) WHERE c <=50) \
     GROUP BY blogurl")
     blogurls_continue = cur.fetchall()
+
 
 
     # 2. get all the blogurl that are already in the Blogtext table:
