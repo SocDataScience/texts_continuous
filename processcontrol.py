@@ -21,12 +21,40 @@ import platform
 
 con = None
 
-
+import sqlite3 as lite
 # ***********************************#
 # Starting the process
 
 start = time.time()
 starttime = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
+
+# *************************************** #
+# Calculating how many start_urls there are:
+if platform.system() == "Darwin":
+    con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
+if platform.system() == "Linux":
+    con = lite.connect('/home/annerose/Python/texts_continuous.db')
+cur = con.cursor()
+con.text_factory = str
+
+cur.execute("SELECT blogurl \
+FROM blogurls \
+WHERE blogID NOT IN (SELECT DISTINCT blogurls.ID \
+FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
+blogurls = cur.fetchall()
+
+cur.execute("SELECT blogurl, MAX(pagenumber) \
+FROM Blogtexts \
+WHERE blogurl IN \
+(SELECT DISTINCT Blogurls.blogurl FROM Blogurls, Blogtexts WHERE Blogurls.blogurl = Blogtexts.blogurl) \
+AND blogurl NOT IN (SELECT DISTINCT Blogtexts.blogurl \
+FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
+AND blogurl IN (SELECT blogurl FROM \
+(SELECT blogurl, COUNT(*) as c FROM Blogtexts GROUP BY blogurl) WHERE c <=50) \
+GROUP BY blogurl")
+blogurls_continue = cur.fetchall()
+
+num_start_urls = len(blogurls + blogurls_continue)
 
 # *************************************** #
 # Send an email to tell me that the process has effectively started as scheduled.
@@ -39,7 +67,8 @@ if platform.system() == "Darwin":
     msg["Subject"] = "Status update from texts_continuous (Mac)"
 
 
-body = "\n\nCrawling of texts_continuous started at %s, \n\n" % starttime
+body = "\n\nCrawling of texts_continuous started at %s, \n\n \
+       with %s starturls." % (starttime,  num_start_urls)
 msg.attach(MIMEText(body, 'plain'))
 
 
