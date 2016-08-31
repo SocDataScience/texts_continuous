@@ -19,9 +19,9 @@ from email.mime.text import MIMEText
 
 import platform
 
-con = None
-
 import sqlite3 as lite
+
+con = None
 # ***********************************#
 # Starting the process
 
@@ -67,8 +67,7 @@ if platform.system() == "Darwin":
     msg["Subject"] = "Status update from texts_continuous (Mac)"
 
 
-body = "\n\nCrawling of texts_continuous started at %s, \n\n \
-       with %s starturls." % (starttime,  num_start_urls)
+body = "Crawling of texts_continuous started at %s, with %s starturls." % (starttime,  num_start_urls)
 msg.attach(MIMEText(body, 'plain'))
 
 

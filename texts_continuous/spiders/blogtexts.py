@@ -80,7 +80,7 @@ class BlogTextSpider(Spider):
     AND blogurl NOT IN (SELECT DISTINCT Blogtexts.blogurl \
     FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
     AND blogurl IN (SELECT blogurl FROM \
-    (SELECT blogurl, COUNT(*) as c FROM Blogtexts GROUP BY blogurl) WHERE c <=50) \
+    (SELECT blogurl, COUNT(*) as c FROM Blogtexts GROUP BY blogurl) WHERE c <=150) \
     GROUP BY blogurl")
     blogurls_continue = cur.fetchall()
 
