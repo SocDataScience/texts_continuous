@@ -65,3 +65,4 @@ COOKIES_ENABLED = False
 # **************************************************** #
 # Adjust the log level that is shown in the terminal when running the spider.
 # LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'DEBUG'

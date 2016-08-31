@@ -8,6 +8,7 @@
 
 from scrapy.spiders import Spider, Rule
 from scrapy.linkextractors import LinkExtractor
+from scrapy.selector import HtmlXPathSelector
 from scrapy import Request
 
 import csv # reading and writing csv files properly
@@ -34,10 +35,12 @@ class BlogTextSpider(Spider):
     allowed_domains = ["blogger.ba"]
 
     # *********************** #
+    global con
     if platform.system() == "Darwin":
         con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
     if platform.system() == "Linux":
         con = lite.connect('/home/annerose/Python/texts_continuous.db')
+    global cur
     cur = con.cursor()
     con.text_factory = str
 
@@ -84,8 +87,6 @@ class BlogTextSpider(Spider):
     GROUP BY blogurl")
     blogurls_continue = cur.fetchall()
 
-
-
     # 2. get all the blogurl that are already in the Blogtext table:
 
 
@@ -106,19 +107,25 @@ class BlogTextSpider(Spider):
             # # blogurls_continue2 = [(i[0], 1) for i in blogurls_continue if i[1]=="empty blog"]
             # blogurls_continue = blogurls_continue1 # + blogurls_continue2
 
-        start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j-20)) for i, j in blogurls_continue] + \
-        [("http://" + i +  ".blogger.ba/arhiva/?start=0") for i in blogurls]
+        blogurls_continue = [("all-the-best", 0)] #debug
+        blogurls = ["1711on"] # debug
 
+        # start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j - 20 if j - 20 >= 0 else 0)) for i, j in
+        #               blogurls_continue] # debug
+
+        # start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j-20 if j-20>=0 else 0)) for i, j in blogurls_continue] + \
+        # [("http://" + i +  ".blogger.ba/arhiva/?start=0") for i in blogurls]
 
         # len(start_urls)
-        # print(start_urls)
         # testing start_url:
-        # start_urls = ["http://inalandofmythandatimeofmagic.blogger.ba/arhiva/?start=8"]
+        start_urls = ["http://sion.blogger.ba/arhiva/?start=0"] # debug start_url
+
+        print(start_urls)
 
         print "=============\n Number of start_urls for Blogtexts: %s\n=============" % len(start_urls)
 
 
-    con.close()
+    # con.close() # shouldn't be closed as con is defined as global variable.
 
 
     # *********************** #
@@ -131,6 +138,7 @@ class BlogTextSpider(Spider):
         return self.parse_item(response)
 
     def parse_item(self, response): # class CrawlSpider uses parse_item, class BaseSpider takes only parse.
+
 
         # *********************** #
 
@@ -256,14 +264,16 @@ class BlogTextSpider(Spider):
             # is subordered to the above code)
 
             if response.xpath("//a[contains(text(), 'Stariji postovi')]"):
+                print "Contains older posts." # debug message
 
                 url = response.xpath("//a[contains(text(), 'Stariji postovi')]/@href").extract()[0]
                 current = response.url
                 current = "/".join(current.split("/")[:3])
                 url = "".join([current, url])
 
-                yield Request(url, callback=self.parse_item)
+                print url # debug message
 
+                yield Request(url, callback=self.check_lastpage)
 
             # *********************** #
 
@@ -281,17 +291,10 @@ class BlogTextSpider(Spider):
             item = BlogTextItem()
             item['blogurl'] = blogurl
 
-        # Connect to db to get the name of the blogger --
-        # it's not possible to know the name of the blogger from the
-        # website in cases the website is entirely empty or hosted by
-        # a different domain.
-            if platform.system() == "Darwin":
-                con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
-            if platform.system() == "Linux":
-                con = lite.connect('/home/annerose/Python/texts_continuous.db')
-            cur = con.cursor()
-            con.text_factory = str
-
+            # Get the name of the blogger from the db:
+            # it's not possible to know the name of the blogger from the
+            # website in cases the website is entirely empty or hosted by
+            # a different domain.
 
             # Get the name of the blogger from the db:
             cur.execute("SELECT Blogurls.blogger FROM Blogurls\
@@ -319,5 +322,31 @@ class BlogTextSpider(Spider):
             print "Blogger: %s; Blogurl: %s; Pagenumber: %s" % (item['blogger'], item['blogurl'], item['pagenumber'])
             yield item
 
+
+
+    def check_lastpage(self, response):
+        # print "check_lastpage running" # debug message
+        # print response.url # debug message
+
+        if response.xpath("//div[@class='post']"):
+            # print "next page contains posts" # debug message
+            next_url = response.url
+            # print "next_url is %s" % next_url # debug message
+            yield Request(next_url, dont_filter=True, callback=self.parse_item) # has to
+            # add dont_filter=True, otherwise the Request won't run.
+            # See http://stackoverflow.com/questions/20723371/scrapy-how-to-debug-scrapy-lost-requests
+
+        else:
+            # print "next page contains no posts -- last page" # debug message
+            blogurl = response.url
+            blogurl = blogurl.split("/")[2]
+            blogurl = blogurl[:-11]
+            # print blogurl # debug message
+            cur.execute("UPDATE Blogtexts SET pagenumber='last page' \
+            WHERE pagenumber= \
+                        (SELECT MAX(pagenumber) FROM Blogtexts \
+                        WHERE blogurl COLLATE NOCASE = ?) \
+            AND blogurl COLLATE NOCASE = ? ", (blogurl, blogurl))
+            con.commit()
 
         # *********************** #
