@@ -114,7 +114,7 @@ class BlogTextSpider(Spider):
 
         # len(start_urls)
         # testing start_url:
-        start_urls = ["http://arapskijezikarabiclanguage.blogger.ba/arhiva/?start=48"] # debug start_url
+        # start_urls = ["http://bayernstuff.blogger.ba/arhiva/?start=28"] # debug start_url
 
         print(start_urls)
 
@@ -245,6 +245,7 @@ class BlogTextSpider(Spider):
                     item['blogurl'] = blogurl
                     item['addedtodb'] = time.strftime("%Y-%m-%d")
                     item['pagenumber'] = pagenumber
+                    item['lastpage'] = None
 
                     yield item
 
@@ -316,6 +317,7 @@ class BlogTextSpider(Spider):
             # item['blogurl'] = blogurl
             item['addedtodb'] = time.strftime("%Y-%m-%d")
             item['pagenumber'] = 'empty blog'
+            item['lastpage'] = None
 
             print "Blogger: %s; Blogurl: %s; Pagenumber: %s" % (item['blogger'], item['blogurl'], item['pagenumber'])
             yield item
@@ -336,19 +338,20 @@ class BlogTextSpider(Spider):
 
         else:
             print "next page contains no posts -- last page" # debug message
+            item = BlogTextItem()
             blogurl = response.url
             blogurl = blogurl.split("/")[2]
             blogurl = blogurl[:-11]
             # print blogurl # debug message
-            from texts_continuous.db import con
-            con = con()
-            cur = con.cursor()
-            cur.execute("UPDATE Blogtexts SET pagenumber='last page' \
-            WHERE pagenumber= \
-                        (SELECT MAX(pagenumber) FROM Blogtexts \
-                        WHERE blogurl COLLATE NOCASE = ?) \
-            AND blogurl COLLATE NOCASE = ? ", (blogurl, blogurl))
-            con.commit()
+            item['blogurl'] = blogurl
+
+            item['lastpage'] = 'last page'
+            item['permalink']  = None
+            item['pagenumber'] = None
+
+            yield item
+
+
 
 
 

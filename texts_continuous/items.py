@@ -20,3 +20,4 @@ class BlogTextItem(scrapy.Item):
     blogurl = scrapy.Field()
     addedtodb = scrapy.Field()
     pagenumber = scrapy.Field()
+    lastpage = scrapy.Field()

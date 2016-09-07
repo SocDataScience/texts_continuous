@@ -45,7 +45,7 @@ class BlogTextPipeline(object):
         result = self.cur.fetchone()
         if result and item['pagenumber']=='last page':
             self.updateInDB(item)
-        if not result:
+        if not result and not item['lastpage']:
             self.storeBlogTextsInDB(item)
         # deal with empty blogs:
         if item['permalink']=='empty blog':
@@ -56,6 +56,9 @@ class BlogTextPipeline(object):
                 self.updateEmptyInDB(item)
             if not empty:
                 self.storeBlogTextsInDB(item)
+        if item['lastpage']:
+            self.updateLastPage(item)
+
         return item
 
 
@@ -94,6 +97,16 @@ class BlogTextPipeline(object):
                           item.get('blogurl', '')))
 
         self.con.commit()
+
+
+    def updateLastPage(self, item):
+        self.cur.execute("UPDATE Blogtexts SET pagenumber='last page' \
+        WHERE pagenumber= \
+                    (SELECT MAX(pagenumber) FROM Blogtexts \
+                    WHERE blogurl COLLATE NOCASE = ?) \
+        AND blogurl COLLATE NOCASE = ? ", (item['blogurl'], item['blogurl']))
+        self.con.commit()
+
     # ************************** #
 
     # If you want to get a new table with every crawl instead of
