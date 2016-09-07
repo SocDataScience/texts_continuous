@@ -11,6 +11,8 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import HtmlXPathSelector
 from scrapy import Request
 
+from imp import reload # import reload in Python 3
+
 import csv # reading and writing csv files properly
 
 import re
@@ -18,11 +20,11 @@ import time
 import random
 
 from texts_continuous.items import BlogTextItem
-
+from texts_continuous.db import con
 
 import sqlite3 as lite
 
-con = None
+# con = None
 
 import platform
 import sys # for using command line arguments
@@ -35,14 +37,9 @@ class BlogTextSpider(Spider):
     allowed_domains = ["blogger.ba"]
 
     # *********************** #
-    global con
-    if platform.system() == "Darwin":
-        con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
-    if platform.system() == "Linux":
-        con = lite.connect('/home/annerose/Python/texts_continuous.db')
-    global cur
+
+    con = con()
     cur = con.cursor()
-    con.text_factory = str
 
     # create blogtexts table if not exists:
     cur.execute("CREATE TABLE IF NOT EXISTS \
@@ -53,7 +50,6 @@ class BlogTextSpider(Spider):
     numbercomments TEXT, commenturl TEXT, \
     blogger TEXT, ID INTEGER, \
     blogurl TEXT, blogID INTEGER, pagenumber INTEGER, addedtodb TEXT)")
-
 
     # Select the start_urls:
     # 1. get all the blogurl values that are only present in the Blogurls table,
@@ -107,25 +103,25 @@ class BlogTextSpider(Spider):
             # # blogurls_continue2 = [(i[0], 1) for i in blogurls_continue if i[1]=="empty blog"]
             # blogurls_continue = blogurls_continue1 # + blogurls_continue2
 
-        blogurls_continue = [("all-the-best", 0)] #debug
-        blogurls = ["1711on"] # debug
+        # blogurls_continue = [("all-the-best", 0)] #debug
+        # blogurls = ["1711on"] # debug
 
         # start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j - 20 if j - 20 >= 0 else 0)) for i, j in
         #               blogurls_continue] # debug
 
-        # start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j-20 if j-20>=0 else 0)) for i, j in blogurls_continue] + \
-        # [("http://" + i +  ".blogger.ba/arhiva/?start=0") for i in blogurls]
+        start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j-20 if j-20>=0 else 0)) for i, j in blogurls_continue] + \
+        [("http://" + i +  ".blogger.ba/arhiva/?start=0") for i in blogurls]
 
         # len(start_urls)
         # testing start_url:
-        start_urls = ["http://sion.blogger.ba/arhiva/?start=0"] # debug start_url
+        start_urls = ["http://arapskijezikarabiclanguage.blogger.ba/arhiva/?start=48"] # debug start_url
 
         print(start_urls)
 
         print "=============\n Number of start_urls for Blogtexts: %s\n=============" % len(start_urls)
 
 
-    # con.close() # shouldn't be closed as con is defined as global variable.
+    con.close() # shouldn't be closed if con is defined as global variable.
 
 
     # *********************** #
@@ -138,7 +134,6 @@ class BlogTextSpider(Spider):
         return self.parse_item(response)
 
     def parse_item(self, response): # class CrawlSpider uses parse_item, class BaseSpider takes only parse.
-
 
         # *********************** #
 
@@ -297,6 +292,9 @@ class BlogTextSpider(Spider):
             # a different domain.
 
             # Get the name of the blogger from the db:
+            from texts_continuous.db import con
+            con = con() # this gives an error -- can't find class/variable db.
+            cur = con.cursor()
             cur.execute("SELECT Blogurls.blogger FROM Blogurls\
                         WHERE Blogurls.blogurl = ? COLLATE NOCASE", (item['blogurl'],))
             try:
@@ -337,16 +335,21 @@ class BlogTextSpider(Spider):
             # See http://stackoverflow.com/questions/20723371/scrapy-how-to-debug-scrapy-lost-requests
 
         else:
-            # print "next page contains no posts -- last page" # debug message
+            print "next page contains no posts -- last page" # debug message
             blogurl = response.url
             blogurl = blogurl.split("/")[2]
             blogurl = blogurl[:-11]
             # print blogurl # debug message
+            from texts_continuous.db import con
+            con = con()
+            cur = con.cursor()
             cur.execute("UPDATE Blogtexts SET pagenumber='last page' \
             WHERE pagenumber= \
                         (SELECT MAX(pagenumber) FROM Blogtexts \
                         WHERE blogurl COLLATE NOCASE = ?) \
             AND blogurl COLLATE NOCASE = ? ", (blogurl, blogurl))
             con.commit()
+
+
 
         # *********************** #
