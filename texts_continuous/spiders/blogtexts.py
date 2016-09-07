@@ -260,7 +260,6 @@ class BlogTextSpider(Spider):
             # is subordered to the above code)
 
             if response.xpath("//a[contains(text(), 'Stariji postovi')]"):
-                print "Contains older posts." # debug message
 
                 url = response.xpath("//a[contains(text(), 'Stariji postovi')]/@href").extract()[0]
                 current = response.url
@@ -268,6 +267,7 @@ class BlogTextSpider(Spider):
                 url = "".join([current, url])
 
                 print url # debug message
+                print "%s contains older posts." % current  # debug message
 
                 yield Request(url, callback=self.check_lastpage)
 
@@ -337,12 +337,12 @@ class BlogTextSpider(Spider):
             # See http://stackoverflow.com/questions/20723371/scrapy-how-to-debug-scrapy-lost-requests
 
         else:
-            print "next page contains no posts -- last page" # debug message
             item = BlogTextItem()
             blogurl = response.url
             blogurl = blogurl.split("/")[2]
             blogurl = blogurl[:-11]
             # print blogurl # debug message
+            print "next page of %s contains no posts -- last page" % blogurl # debug message
             item['blogurl'] = blogurl
 
             item['lastpage'] = 'last page'
