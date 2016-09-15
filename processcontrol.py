@@ -39,19 +39,19 @@ con.text_factory = str
 
 cur.execute("SELECT blogurl \
 FROM blogurls \
-WHERE blogID NOT IN (SELECT DISTINCT blogurls.ID \
+WHERE blogID NOT IN (SELECT DISTINCT blogurls.blogID \
 FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
 blogurls = cur.fetchall()
 
 cur.execute("SELECT blogurl, MAX(pagenumber) \
 FROM Blogtexts \
-WHERE blogurl IN \
-(SELECT DISTINCT Blogurls.blogurl FROM Blogurls, Blogtexts WHERE Blogurls.blogurl = Blogtexts.blogurl) \
-AND blogurl NOT IN (SELECT DISTINCT Blogtexts.blogurl \
+WHERE blogID IN \
+(SELECT DISTINCT Blogurls.blogID FROM Blogurls, Blogtexts WHERE Blogurls.blogID = Blogtexts.blogID) \
+AND blogID NOT IN (SELECT DISTINCT Blogtexts.blogID \
 FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
-AND blogurl IN (SELECT blogurl FROM \
-(SELECT blogurl, COUNT(*) as c FROM Blogtexts GROUP BY blogurl) WHERE c <=50) \
-GROUP BY blogurl")
+AND blogID IN (SELECT blogID FROM \
+(SELECT blogID, COUNT(*) as c FROM Blogtexts GROUP BY blogID) WHERE c <=50) \
+GROUP BY blogID")
 blogurls_continue = cur.fetchall()
 
 num_start_urls = len(blogurls + blogurls_continue)
