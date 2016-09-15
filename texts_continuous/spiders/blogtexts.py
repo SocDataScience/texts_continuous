@@ -113,7 +113,7 @@ class BlogTextSpider(Spider):
 
         # len(start_urls)
         # testing start_url:
-        start_urls = ["http://dreamongirl.blogger.ba/arhiva/?start=0"] # debug start_url
+        # start_urls = ["http://dreamongirl.blogger.ba/arhiva/?start=0"] # debug start_url
 
         print(start_urls)
 
