@@ -13,7 +13,6 @@ from scrapy import Request
 
 from imp import reload # import reload in Python 3
 
-import csv # reading and writing csv files properly
 
 import re
 import time
@@ -114,7 +113,7 @@ class BlogTextSpider(Spider):
 
         # len(start_urls)
         # testing start_url:
-        # start_urls = ["http://bayernstuff.blogger.ba/arhiva/?start=28"] # debug start_url
+        start_urls = ["http://dreamongirl.blogger.ba/arhiva/?start=0"] # debug start_url
 
         print(start_urls)
 
@@ -127,16 +126,34 @@ class BlogTextSpider(Spider):
     # *********************** #
     # *********************** #
 
+    # http://stackoverflow.com/questions/20081024/scrapy-get-request-url-in-parse
+    # overwrite make_requests_from_url so that blogurls that redirect can be
+    # correctly stored in the db.
+    def make_requests_from_url(self, url):
+        item = BlogTextItem()
+
+        blogurl = url
+        blogurl = blogurl.split("/")[2]
+        blogurl = blogurl.split(".")[0]
+        item['blogurl'] = blogurl
+        print "Request url: %s " % blogurl
+
+        request = Request(url, dont_filter=True)
+
+        # set the meta['item'] to use the item in the next call back
+        request.meta['item'] = item
+        return request
+
+
     # Once I have the urls, scrape the urls for responses:
 
     # Make sure even the texts from the start page are crawled:
     def parse(self, response):
         return self.parse_item(response)
 
-    def parse_item(self, response): # class CrawlSpider uses parse_item, class BaseSpider takes only parse.
+    def parse_item(self, response): # class CrawlSpider uses parse_item, class (Base)Spider takes only parse.
 
         # *********************** #
-
         # Procedure to follow if the blog is not entirely empty
         # (i.e. contains at least one single post), and the blog is
         # not hosted by a different domain than blogger.ba:
@@ -211,11 +228,8 @@ class BlogTextSpider(Spider):
                     else:
                         blogger = ''
 
-            # url and pagenumber of the blog:
+            # pagenumber of the blog:
                     if re.search("(.blogger.ba/arhiva/)", response.url):
-                        blogurl = response.url
-                        blogurl = blogurl.split("/")[2]
-                        blogurl = blogurl[:-11]
 
                         if response.xpath("//a[contains(text(), 'Stariji postovi')]"):
                             pagenumber = response.url.split("/")[-1]
@@ -224,15 +238,12 @@ class BlogTextSpider(Spider):
                             pagenumber = 'last page'
 
                     else:
-                        blogurl = response.url
                         pagenumber = 'last page'
-
-
 
             # *********************** #
 
             # fill the item if the info as defined in the above code:
-                    item = BlogTextItem()
+                    item = response.meta['item']
 
                     item['posttime'] = posttime
                     item['postdate'] = postdate
@@ -242,7 +253,7 @@ class BlogTextSpider(Spider):
                     item['numbercomments'] = numbercomments
                     item['commenturl'] = commenturl
                     item['blogger'] = blogger
-                    item['blogurl'] = blogurl
+                    # item['blogurl'] = blogurl
                     item['addedtodb'] = time.strftime("%Y-%m-%d")
                     item['pagenumber'] = pagenumber
                     item['lastpage'] = None
@@ -276,16 +287,10 @@ class BlogTextSpider(Spider):
         # How to fill the items if the blog is entirely emtpy
         # or is hosted inside a different domain than blogger.ba:
         else:
-            # url of the blog:
-            if re.search("(.blogger.ba)", response.url):
-                blogurl = response.url
-                blogurl = blogurl[7:-27]
-            else:
-                blogurl = response.url
+            item = response.meta['item']
 
+            print "Blogurl of empty blog is: %s" % item['blogurl']
 
-            item = BlogTextItem()
-            item['blogurl'] = blogurl
 
             # Get the name of the blogger from the db:
             # it's not possible to know the name of the blogger from the
@@ -314,14 +319,12 @@ class BlogTextSpider(Spider):
             item['numbercomments'] = 'empty blog'
             item['commenturl'] = 'empty blog'
             item['blogger'] = blogger
-            # item['blogurl'] = blogurl
             item['addedtodb'] = time.strftime("%Y-%m-%d")
             item['pagenumber'] = 'empty blog'
             item['lastpage'] = None
 
             print "Blogger: %s; Blogurl: %s; Pagenumber: %s" % (item['blogger'], item['blogurl'], item['pagenumber'])
             yield item
-
 
 
     def check_lastpage(self, response):
@@ -337,13 +340,8 @@ class BlogTextSpider(Spider):
             # See http://stackoverflow.com/questions/20723371/scrapy-how-to-debug-scrapy-lost-requests
 
         else:
-            item = BlogTextItem()
-            blogurl = response.url
-            blogurl = blogurl.split("/")[2]
-            blogurl = blogurl[:-11]
-            # print blogurl # debug message
-            print "next page of %s contains no posts -- last page" % blogurl # debug message
-            item['blogurl'] = blogurl
+            item = response.meta['item']
+            print "next page of %s contains no posts -- last page" % item['blogurl'] # debug message
 
             item['lastpage'] = 'last page'
             item['permalink']  = None
