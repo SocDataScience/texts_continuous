@@ -92,7 +92,7 @@ class BlogTextSpider(Spider):
         # len(start_urls)
         # testing start_url:
         # start_urls = ["http://cokoladai.blogger.ba/arhiva/?start=0"] # debug start_url
-        # start_urls = ["http://protagonist.blogger.ba/arhiva/?start=0"]  # debug start_url
+        start_urls = ["http://mojahurija.blogger.ba/arhiva/?start=0"]  # debug start_url
 
         print(start_urls)
 
@@ -130,6 +130,7 @@ class BlogTextSpider(Spider):
         request = Request(url, dont_filter=True, callback=self.parse_item)
 
         # set the meta['item'] to use the item in the next call back
+        self.request_url = request.url
         request.meta['item'] = item
         # print request.meta['item'] #debug message
         return request
@@ -167,6 +168,7 @@ class BlogTextSpider(Spider):
                         posttime = sel.xpath("p[@class='footer-posta']/text()").re('\d{2}:\d{2}')[0]
                     else:
                         posttime = ''
+                    # print "Posttime: %s" %posttime # debug message
 
             # postdate:
                     if sel.xpath("preceding::h5[@class='datum' and position()=1]/text()").extract():
@@ -176,6 +178,7 @@ class BlogTextSpider(Spider):
                         postdate = "-".join([postdate[2], postdate[1], postdate[0]])
                     else:
                         postdate = ''
+                    # print "Postdate: %s" % postdate # debug message
 
             # permalink to post (that's the url where the post is archived online):
                     if sel.xpath("p[@class='footer-posta']/a[@title='Permalink']/@href"):
@@ -184,12 +187,14 @@ class BlogTextSpider(Spider):
                         permalink = permalink[8:]
                     else:
                         permalink = ''
+                    # print "Permalink: %s" % permalink # debug message
 
             # posttitle:
                     if sel.xpath("h4[@class='naslov-posta']/text()").extract():
                         posttitle = sel.xpath("h4[@class='naslov-posta']/text()").extract()[0]
                     else:
                         posttitle = ''
+                    # print "Posttitle: %s" %posttitle # debug message
 
 
             # conditions for filling posttext ("reduce" not possible with empty posttext):
@@ -199,12 +204,14 @@ class BlogTextSpider(Spider):
                                                                                                        " ").strip().encode('utf8')
                     else:
                         posttext = ''
+                    print "Posttext: %s" % posttext
 
             # numbercomments if enabled by user:
                     if sel.xpath("p[@class='footer-posta']/a[@title='Komentari']/text()").re('\d+'):
                         numbercomments = sel.xpath("p[@class='footer-posta']/a[@title='Komentari']/text()").re('\d+')[0]
                     else:
                         numbercomments = 'Not enabled'
+                    print "Numbercomments: %s" % numbercomments
 
             # commenturl if enabled and if comments have been posted:
                     if sel.xpath("p[@class='footer-posta']/a[@title='Komentari']/@href").extract():
@@ -212,6 +219,7 @@ class BlogTextSpider(Spider):
                         commenturl = commenturl[32:]
                     else:
                         commenturl = ''
+                    # print "Commenturl: %s" % commenturl # debug message
 
             # name of the blogger of the blog:
                     if sel.xpath("p[@class='footer-posta']/a[1]/@href"):
@@ -220,8 +228,9 @@ class BlogTextSpider(Spider):
                         # print "Scraping blogger %s " %blogger
                     else:
                         blogger = ''
+                    # print "Blogger: %s" % blogger # debug message
 
-            # pagenumber of the blog:
+                        # pagenumber of the blog:
                     if re.search("(.blogger.ba/arhiva/)", response.url):
 
                         if response.xpath("//a[contains(text(), 'Stariji postovi')]"):
@@ -233,6 +242,8 @@ class BlogTextSpider(Spider):
                     else:
                         pagenumber = 'last page'
 
+                    # print "Pagenumber: %s" % pagenumber # debug message
+                    # time.sleep(10)  # debug
             # *********************** #
 
             # fill the item if the info as defined in the above code:
@@ -272,8 +283,8 @@ class BlogTextSpider(Spider):
                 current = "/".join(current.split("/")[:3])
                 url = "".join([current, url])
 
-                print url # debug message
-                print "%s contains older posts." % current  # debug message
+                # print url # debug message
+                # print "%s contains older posts." % current  # debug message
 
                 yield Request(url, callback=self.check_lastpage)
 
@@ -281,10 +292,15 @@ class BlogTextSpider(Spider):
 
         # How to fill the items if the blog is entirely emtpy
         # or is hosted inside a different domain than blogger.ba:
-        if response.status == 404 or not response.xpath("//div[@class='post']"):
+        if response.status == 404 or not response.xpath("//div[@class='post']") or self.request_url!=response.url:
+
             item = response.meta['item']
 
-            print "%s contains NO posts" % item['blogurl']
+            # if self.request_url!=response.url:
+            #     print "Redirect from %s to %s" % (self.request_url, response.url) # debug message
+
+
+            # print "%s contains NO posts" % item['blogurl'] # debug message
 
 
             # Get the name of the blogger from the db:
@@ -336,7 +352,7 @@ class BlogTextSpider(Spider):
 
         else:
             item = response.meta['item']
-            print "next page of %s contains no posts -- last page" % item['blogurl'] # debug message
+            # print "next page of %s contains no posts -- last page" % item['blogurl'] # debug message
 
             item['lastpage'] = 'last page'
             item['permalink']  = None
