@@ -9,7 +9,8 @@
 from scrapy.spiders import Spider, Rule
 from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import HtmlXPathSelector
-from scrapy import Request
+# from scrapy import Request
+from scrapy.http import Request
 
 from imp import reload # import reload in Python 3
 
@@ -35,6 +36,7 @@ class BlogTextSpider(Spider):
     name = "texts_continuous"
     allowed_domains = ["blogger.ba"]
 
+    handle_httpstatus_list = [404] # http://stackoverflow.com/questions/16909106/scrapyin-a-request-fails-eg-404-500-how-to-ask-for-another-alternative-reque
     # *********************** #
 
     con = con()
@@ -53,23 +55,14 @@ class BlogTextSpider(Spider):
     # Select the start_urls:
     # 1. get all the blogurl values that are only present in the Blogurls table,
     # but not yet in the Blogtext table:
-
     cur.execute("SELECT blogurl \
     FROM blogurls \
     WHERE blogID NOT IN (SELECT DISTINCT blogurls.blogID \
     FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
     blogurls = cur.fetchall()
 
-    # Use this approach if you really want to get ALL blogtexts:
-    # cur.execute("SELECT blogurl, MAX(pagenumber) \
-    # FROM Blogtexts \
-    # WHERE Blogtexts.blogurl IN \
-    # (SELECT DISTINCT Blogurls.blogurl FROM Blogurls, Blogtexts WHERE Blogurls.blogurl = Blogtexts.blogurl) \
-    # AND Blogtexts.blogurl NOT IN (SELECT DISTINCT Blogtexts.blogurl \
-    # FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
-    # GROUP BY blogurl")
-    # blogurls_continue = cur.fetchall()
 
+    # 2. get all the blogurl that are already in the Blogtext table:
     # Use this approach if 50 blogtexts per blog are enough:
     cur.execute("SELECT blogurl, MAX(pagenumber) \
     FROM Blogtexts \
@@ -82,8 +75,6 @@ class BlogTextSpider(Spider):
     GROUP BY blogID")
     blogurls_continue = cur.fetchall()
 
-    # 2. get all the blogurl that are already in the Blogtext table:
-
 
     if not blogurls:
         print "=== ERROR/WARNING MESSAGE FROM CRAWLER blogtexts: ===\n" \
@@ -94,26 +85,14 @@ class BlogTextSpider(Spider):
         blogurls = [i[0] for i in blogurls]
         if not blogurls_continue:
             blogurls_continue = []
-            # # take out the blogs which have been found to be empty:
-            # blogurls_continue1 = [i for i in blogurls_continue if i[1]!="empty blog"]
-            #
-            # # I comment out the following line so that empty blogs aren't
-            # # scraped again when restarting the scrawler:
-            # # blogurls_continue2 = [(i[0], 1) for i in blogurls_continue if i[1]=="empty blog"]
-            # blogurls_continue = blogurls_continue1 # + blogurls_continue2
-
-        # blogurls_continue = [("all-the-best", 0)] #debug
-        # blogurls = ["1711on"] # debug
-
-        # start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j - 20 if j - 20 >= 0 else 0)) for i, j in
-        #               blogurls_continue] # debug
 
         start_urls = [("http://" + i + ".blogger.ba/arhiva/?start=" + str(j-20 if j-20>=0 else 0)) for i, j in blogurls_continue] + \
         [("http://" + i +  ".blogger.ba/arhiva/?start=0") for i in blogurls]
 
         # len(start_urls)
         # testing start_url:
-        # start_urls = ["http://dreamongirl.blogger.ba/arhiva/?start=0"] # debug start_url
+        # start_urls = ["http://cokoladai.blogger.ba/arhiva/?start=0"] # debug start_url
+        # start_urls = ["http://protagonist.blogger.ba/arhiva/?start=0"]  # debug start_url
 
         print(start_urls)
 
@@ -125,23 +104,34 @@ class BlogTextSpider(Spider):
 
     # *********************** #
     # *********************** #
+    # http://stackoverflow.com/questions/13476688/scrapy-unhandled-exception
+    def start_requests(self):
+        for url in self.start_urls:
+            requests = self.make_requests_from_url(url)
+            if type(requests) is list:
+                for request in requests:
+                    yield request
+            else:
+                yield requests
 
     # http://stackoverflow.com/questions/20081024/scrapy-get-request-url-in-parse
     # overwrite make_requests_from_url so that blogurls that redirect can be
-    # correctly stored in the db.
+    # correctly stored in the db:
     def make_requests_from_url(self, url):
         item = BlogTextItem()
 
         blogurl = url
+        print "Request url: %s " % url #debug message
         blogurl = blogurl.split("/")[2]
         blogurl = blogurl.split(".")[0]
         item['blogurl'] = blogurl
         print "Request url: %s " % blogurl
 
-        request = Request(url, dont_filter=True)
+        request = Request(url, dont_filter=True, callback=self.parse_item)
 
         # set the meta['item'] to use the item in the next call back
         request.meta['item'] = item
+        # print request.meta['item'] #debug message
         return request
 
 
@@ -149,10 +139,13 @@ class BlogTextSpider(Spider):
 
     # Make sure even the texts from the start page are crawled:
     def parse(self, response):
+        print response.status
+
+        print "Response url: %s" % response.url
         return self.parse_item(response)
 
     def parse_item(self, response): # class CrawlSpider uses parse_item, class (Base)Spider takes only parse.
-
+        print "Response status: %s" % response.status
         # *********************** #
         # Procedure to follow if the blog is not entirely empty
         # (i.e. contains at least one single post), and the blog is
@@ -244,6 +237,8 @@ class BlogTextSpider(Spider):
 
             # fill the item if the info as defined in the above code:
                     item = response.meta['item']
+                    print "%s contains posts" % response.meta['item']['blogurl']  # debug message
+
 
                     item['posttime'] = posttime
                     item['postdate'] = postdate
@@ -286,10 +281,10 @@ class BlogTextSpider(Spider):
 
         # How to fill the items if the blog is entirely emtpy
         # or is hosted inside a different domain than blogger.ba:
-        else:
+        if response.status == 404 or not response.xpath("//div[@class='post']"):
             item = response.meta['item']
 
-            print "Blogurl of empty blog is: %s" % item['blogurl']
+            print "%s contains NO posts" % item['blogurl']
 
 
             # Get the name of the blogger from the db:
