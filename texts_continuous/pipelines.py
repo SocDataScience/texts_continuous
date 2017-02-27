@@ -29,7 +29,8 @@ class BlogTextPipeline(object):
 
     def setupDBcon(self):
         if platform.system() == "Darwin":
-            self.con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
+            self.con = lite.connect('/Users/Annerose/Desktop/test.db')
+            # self.con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
         if platform.system() == "Linux":
             self.con = lite.connect('/home/annerose/Python/texts_continuous.db')
         self.cur = self.con.cursor()

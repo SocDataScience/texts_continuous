@@ -39,8 +39,13 @@ class BlogTextSpider(Spider):
     handle_httpstatus_list = [404] # http://stackoverflow.com/questions/16909106/scrapyin-a-request-fails-eg-404-500-how-to-ask-for-another-alternative-reque
     # *********************** #
 
-    con = con()
+    if platform.system() == "Darwin":
+        con = lite.connect('/Users/Annerose/Desktop/test.db')
+        # con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
+    if platform.system() == "Linux":
+        con = lite.connect('/home/annerose/Python/texts_continuous.db')
     cur = con.cursor()
+    con.text_factory = str
 
     # create blogtexts table if not exists:
     cur.execute("CREATE TABLE IF NOT EXISTS \
@@ -52,28 +57,45 @@ class BlogTextSpider(Spider):
     blogger TEXT, ID INTEGER, \
     blogurl TEXT, blogID INTEGER, pagenumber INTEGER, addedtodb TEXT)")
 
-    # Select the start_urls:
-    # 1. get all the blogurl values that are only present in the Blogurls table,
-    # but not yet in the Blogtext table:
-    cur.execute("SELECT blogurl \
-    FROM blogurls \
-    WHERE blogID NOT IN (SELECT DISTINCT blogurls.blogID \
-    FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
+
+    # For which blogurls do I want to collect additional texts?
+    # To determine the blogurls, I have to apply the same criteria as for the edgelist_continuous scraper!!!
+
+
+    # This selects only blogurls which are not yet in the blogtexts table (i.e.
+    # blogurls for which no texts have been collected so far):
+    # cur.execute("SELECT blogurl \
+    # FROM blogurls \
+    # WHERE blogID NOT IN (SELECT DISTINCT blogurls.blogID \
+    # FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
+    # blogurls = cur.fetchall()
+
+    # Collect instead all blogurls which belong to bloggers for which I have
+    # scraped the edgelist:
+    # Restrict the sample to blogs for which I have so far collected less than 100 blogposts!
+    # http://stackoverflow.com/questions/2309227/sqlite-select-with-condition-on-date
+    cur.execute("SELECT DISTINCT blogurl \
+    FROM blogurls WHERE blogurl COLLATE NOCASE NOT IN (SELECT DISTINCT blogurl COLLATE NOCASE \
+    FROM Blogtexts WHERE pagenumber=='empty blog' OR \
+    (date(addedtodb)>=date('2017-02-19') AND pagenumber=='last page' )) AND \
+     blogurl COLLATE NOCASE NOT IN (SELECT blogurl COLLATE NOCASE FROM \
+    (SELECT blogurl COLLATE NOCASE, COUNT(*) as c FROM Blogtexts GROUP BY blogurl COLLATE NOCASE) AS t WHERE t.c >=30)")
     blogurls = cur.fetchall()
 
+    # cur.execute("SELECT blogurl, MAX(pagenumber) \
+    # FROM Blogtexts \
+    # WHERE blogID IN \
+    # (SELECT DISTINCT Blogurls.blogID FROM Blogurls, Blogtexts WHERE Blogurls.blogID = Blogtexts.blogID) \
+    # AND blogID NOT IN (SELECT DISTINCT Blogtexts.blogID \
+    # FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
+    # AND blogID IN (SELECT blogID FROM \
+    # (SELECT blogID, COUNT(*) as c FROM Blogtexts GROUP BY blogID) WHERE c <=50) \
+    # GROUP BY blogID")
+    # blogurls_continue = cur.fetchall()
 
-    # 2. get all the blogurl that are already in the Blogtext table:
-    # Use this approach if 50 blogtexts per blog are enough:
-    cur.execute("SELECT blogurl, MAX(pagenumber) \
-    FROM Blogtexts \
-    WHERE blogID IN \
-    (SELECT DISTINCT Blogurls.blogID FROM Blogurls, Blogtexts WHERE Blogurls.blogID = Blogtexts.blogID) \
-    AND blogID NOT IN (SELECT DISTINCT Blogtexts.blogID \
-    FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
-    AND blogID IN (SELECT blogID FROM \
-    (SELECT blogID, COUNT(*) as c FROM Blogtexts GROUP BY blogID) WHERE c <=50) \
-    GROUP BY blogID")
-    blogurls_continue = cur.fetchall()
+    blogurls_continue = None
+    # num_start_urls = len(blogurls + blogurls_continue)
+    num_start_urls = len(blogurls)
 
 
     if not blogurls:
@@ -91,8 +113,8 @@ class BlogTextSpider(Spider):
 
         # len(start_urls)
         # testing start_url:
-        # start_urls = ["http://cokoladai.blogger.ba/arhiva/?start=0"] # debug start_url
-        start_urls = ["http://mojahurija.blogger.ba/arhiva/?start=0"]  # debug start_url
+        # start_urls = ["http://cokoladai.blogger.ba/arhiva/?start=0"] # debug start_url, blog no longer exists
+        # start_urls = ["http://pozivnica.blogger.ba/arhiva/?start=1"]  # debug start_url
 
         print(start_urls)
 
@@ -110,6 +132,7 @@ class BlogTextSpider(Spider):
             requests = self.make_requests_from_url(url)
             if type(requests) is list:
                 for request in requests:
+                    # print "First request is %s" % request
                     yield request
             else:
                 yield requests
@@ -121,18 +144,18 @@ class BlogTextSpider(Spider):
         item = BlogTextItem()
 
         blogurl = url
-        print "Request url: %s " % url #debug message
+        # print "Request url: %s " % url #debug message
         blogurl = blogurl.split("/")[2]
         blogurl = blogurl.split(".")[0]
         item['blogurl'] = blogurl
         print "Request url: %s " % blogurl
 
-        request = Request(url, dont_filter=True, callback=self.parse_item)
+        request = Request(url, dont_filter = True, callback = self.parse_item)
 
         # set the meta['item'] to use the item in the next call back
         self.request_url = request.url
         request.meta['item'] = item
-        # print request.meta['item'] #debug message
+        print "Request.meta is: %s" % request.meta['item'] #debug message
         return request
 
 
@@ -141,9 +164,13 @@ class BlogTextSpider(Spider):
     # Make sure even the texts from the start page are crawled:
     def parse(self, response):
         print response.status
+        item = response.meta['item']
+        return item
 
         print "Response url: %s" % response.url
         return self.parse_item(response)
+
+
 
     def parse_item(self, response): # class CrawlSpider uses parse_item, class (Base)Spider takes only parse.
         print "Response status: %s" % response.status
@@ -204,14 +231,14 @@ class BlogTextSpider(Spider):
                                                                                                        " ").strip().encode('utf8')
                     else:
                         posttext = ''
-                    print "Posttext: %s" % posttext
+                    # print "Posttext: %s" % posttext
 
             # numbercomments if enabled by user:
                     if sel.xpath("p[@class='footer-posta']/a[@title='Komentari']/text()").re('\d+'):
                         numbercomments = sel.xpath("p[@class='footer-posta']/a[@title='Komentari']/text()").re('\d+')[0]
                     else:
                         numbercomments = 'Not enabled'
-                    print "Numbercomments: %s" % numbercomments
+                    # print "Numbercomments: %s" % numbercomments
 
             # commenturl if enabled and if comments have been posted:
                     if sel.xpath("p[@class='footer-posta']/a[@title='Komentari']/@href").extract():
@@ -228,7 +255,7 @@ class BlogTextSpider(Spider):
                         # print "Scraping blogger %s " %blogger
                     else:
                         blogger = ''
-                    # print "Blogger: %s" % blogger # debug message
+                    print "Blogger: %s" % blogger # debug message
 
                         # pagenumber of the blog:
                     if re.search("(.blogger.ba/arhiva/)", response.url):
@@ -246,8 +273,9 @@ class BlogTextSpider(Spider):
                     # time.sleep(10)  # debug
             # *********************** #
 
-            # fill the item if the info as defined in the above code:
-                    item = response.meta['item']
+            # fill the item if the info is defined in the above code:
+                    item = BlogTextItem()
+                    # item['blogurl'] = response.meta['item']['blogurl']
                     print "%s contains posts" % response.meta['item']['blogurl']  # debug message
 
 
@@ -259,15 +287,17 @@ class BlogTextSpider(Spider):
                     item['numbercomments'] = numbercomments
                     item['commenturl'] = commenturl
                     item['blogger'] = blogger
-                    # item['blogurl'] = blogurl
+                    item['blogurl'] = response.meta['item']['blogurl']
                     item['addedtodb'] = time.strftime("%Y-%m-%d")
                     item['pagenumber'] = pagenumber
                     item['lastpage'] = None
 
+                    self.item = item
                     yield item
 
                 except: # if there was an error message: just pass and continue
                     # with the next blogpost.
+                    print "there was some error with scraping the texts" # debug message
                     pass
 
             # *********************** #
@@ -286,18 +316,27 @@ class BlogTextSpider(Spider):
                 # print url # debug message
                 # print "%s contains older posts." % current  # debug message
 
-                yield Request(url, callback=self.check_lastpage)
+                yield Request(url, callback = self.check_lastpage)
 
             # *********************** #
 
         # How to fill the items if the blog is entirely emtpy
         # or is hosted inside a different domain than blogger.ba:
-        if response.status == 404 or not response.xpath("//div[@class='post']") or self.request_url!=response.url:
+        if response.status == 404 or not response.xpath("//div[@class='post']"):
 
-            item = response.meta['item']
+            if response.status == 404:
+                print "response.status == 404"
 
-            # if self.request_url!=response.url:
-            #     print "Redirect from %s to %s" % (self.request_url, response.url) # debug message
+            if not response.xpath("//div[@class='post']"):
+                print "doesn't contain posts"
+
+            if self.request_url.split("/")[2]!=response.url.split("/")[2]:
+                print "Redirect from %s to %s" % (self.request_url, response.url) # debug message
+
+            print "self.request_url is %s" % self.request_url
+
+            item = BlogTextItem()
+            item['blogurl'] = self.request_url.split("/")[2].split(".")[0]
 
 
             # print "%s contains NO posts" % item['blogurl'] # debug message
@@ -351,8 +390,8 @@ class BlogTextSpider(Spider):
             # See http://stackoverflow.com/questions/20723371/scrapy-how-to-debug-scrapy-lost-requests
 
         else:
-            item = response.meta['item']
-            # print "next page of %s contains no posts -- last page" % item['blogurl'] # debug message
+            item = self.item
+            print "next page of %s contains no posts -- last page" % item['blogurl'] # debug message
 
             item['lastpage'] = 'last page'
             item['permalink']  = None

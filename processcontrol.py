@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# Works on python 2. To change python virtual environment to python 2, type
+# annerose2015-11
 # This is a process control file.
 
 # It starts the python process for the continuousscraper; checks
@@ -31,30 +33,50 @@ starttime = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
 # *************************************** #
 # Calculating how many start_urls there are:
 if platform.system() == "Darwin":
-    con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
+    con = lite.connect('/Users/Annerose/Desktop/test.db')
+    # con = lite.connect('/Users/Annerose/Documents/15-16/Data/texts_continuous.db')
 if platform.system() == "Linux":
     con = lite.connect('/home/annerose/Python/texts_continuous.db')
 cur = con.cursor()
 con.text_factory = str
 
+
+# For which blogurls do I want to collect additional texts?
+# To determine the blogurls, I have to apply the same criteria as for the edgelist_continuous scraper!!!
+
+
+# This selects only blogurls which are not yet in the blogtexts table (i.e.
+# blogurls for which no texts have been collected so far):
+# cur.execute("SELECT blogurl \
+# FROM blogurls \
+# WHERE blogID NOT IN (SELECT DISTINCT blogurls.blogID \
+# FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
+# blogurls = cur.fetchall()
+
+# Collect instead all blogurls which belong to bloggers for which I have
+# scraped the edgelist:
+# Restrict the sample to blogs for which I have so far collected less than 100 blogposts!
 cur.execute("SELECT blogurl \
-FROM blogurls \
-WHERE blogID NOT IN (SELECT DISTINCT blogurls.blogID \
-FROM blogurls, blogtexts WHERE blogurls.blogID = blogtexts.blogID)")
+FROM blogurls WHERE blogurl COLLATE NOCASE NOT IN (SELECT DISTINCT blogurl COLLATE NOCASE \
+FROM Blogtexts WHERE Blogtexts.pagenumber=='empty blog') AND \
+ blogurl COLLATE NOCASE NOT IN (SELECT blogurl COLLATE NOCASE FROM \
+(SELECT blogurl COLLATE NOCASE, COUNT(*) as c FROM Blogtexts GROUP BY blogurl COLLATE NOCASE) AS t WHERE t.c >=100)")
 blogurls = cur.fetchall()
 
-cur.execute("SELECT blogurl, MAX(pagenumber) \
-FROM Blogtexts \
-WHERE blogID IN \
-(SELECT DISTINCT Blogurls.blogID FROM Blogurls, Blogtexts WHERE Blogurls.blogID = Blogtexts.blogID) \
-AND blogID NOT IN (SELECT DISTINCT Blogtexts.blogID \
-FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
-AND blogID IN (SELECT blogID FROM \
-(SELECT blogID, COUNT(*) as c FROM Blogtexts GROUP BY blogID) WHERE c <=50) \
-GROUP BY blogID")
-blogurls_continue = cur.fetchall()
 
-num_start_urls = len(blogurls + blogurls_continue)
+# cur.execute("SELECT blogurl, MAX(pagenumber) \
+# FROM Blogtexts \
+# WHERE blogID IN \
+# (SELECT DISTINCT Blogurls.blogID FROM Blogurls, Blogtexts WHERE Blogurls.blogID = Blogtexts.blogID) \
+# AND blogID NOT IN (SELECT DISTINCT Blogtexts.blogID \
+# FROM Blogtexts WHERE Blogtexts.pagenumber=='last page' OR Blogtexts.pagenumber=='empty blog') \
+# AND blogID IN (SELECT blogID FROM \
+# (SELECT blogID, COUNT(*) as c FROM Blogtexts GROUP BY blogID) WHERE c <=50) \
+# GROUP BY blogID")
+# blogurls_continue = cur.fetchall()
+
+# num_start_urls = len(blogurls + blogurls_continue)
+num_start_urls = len(blogurls)
 
 # *************************************** #
 # Send an email to tell me that the process has effectively started as scheduled.

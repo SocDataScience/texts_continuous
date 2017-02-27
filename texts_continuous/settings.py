@@ -39,7 +39,7 @@ ITEM_PIPELINES = {'texts_continuous.pipelines.BlogTextPipeline': 0}
 
 
 # DEPTH_LIMIT = 0 # crawl all pages of any blog.
-DEPTH_LIMIT = 50 # crawl only 50 pages of any given blog. -- Don't
+DEPTH_LIMIT = 100 # crawl only 100 pages of any given blog. -- Don't
 # crawl until last page of a blog is reached.
 LOG_LEVEL = 'INFO'
 
