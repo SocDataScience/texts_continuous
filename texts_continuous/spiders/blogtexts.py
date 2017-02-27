@@ -77,9 +77,9 @@ class BlogTextSpider(Spider):
     cur.execute("SELECT DISTINCT blogurl \
     FROM blogurls WHERE blogurl COLLATE NOCASE NOT IN (SELECT DISTINCT blogurl COLLATE NOCASE \
     FROM Blogtexts WHERE pagenumber=='empty blog' OR \
-    (date(addedtodb)>=date('2017-02-19') AND pagenumber=='last page' )) AND \
+    (date(addedtodb)>=date('2017-02-19') )) AND \
      blogurl COLLATE NOCASE NOT IN (SELECT blogurl COLLATE NOCASE FROM \
-    (SELECT blogurl COLLATE NOCASE, COUNT(*) as c FROM Blogtexts GROUP BY blogurl COLLATE NOCASE) AS t WHERE t.c >=30)")
+    (SELECT blogurl COLLATE NOCASE, COUNT(*) as c FROM Blogtexts GROUP BY blogurl COLLATE NOCASE) AS t WHERE t.c >=10)")
     blogurls = cur.fetchall()
 
     # cur.execute("SELECT blogurl, MAX(pagenumber) \
